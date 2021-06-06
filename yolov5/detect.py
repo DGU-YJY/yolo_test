@@ -13,7 +13,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import colors, plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 import os
-os.remove('clothes.txt')
+# os.remove('clothes.txt')
 
 
 @torch.no_grad()
@@ -114,10 +114,10 @@ def detect(opt):
                     if save_img or opt.save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if opt.hide_labels else (names[c] if opt.hide_conf else f'{names[c]} {conf:.2f}')
-                        #여기다가 추가함
-                        with open('clothes.txt', 'a') as result:
-                            nnn = names[c]
-                            result.write(nnn)
+                        # #여기다가 추가함
+                        # with open('clothes.txt', 'a') as result:
+                        #     nnn = names[c]
+                        #     result.write(nnn)
                         plot_one_box(xyxy, im0, label=label, color=colors(c, True), line_thickness=opt.line_thickness)
                         if opt.save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
