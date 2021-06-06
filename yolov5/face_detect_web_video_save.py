@@ -1,25 +1,62 @@
-from flask import Flask, render_template, Response
-from flask_opencv_streamer.streamer import Streamer
 import cv2
+import threading
+import sys
+from PyQt5 import QtWidgets
+from PyQt5 import QtGui
+from PyQt5 import QtCore
 
-app = Flask(__name__)
+running = False
+def run():
+    global running
+    cap = cv2.VideoCapture(-1)
+    width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    label.resize(width, height)
+    while running:
+        ret, img = cap.read()
+        if ret:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
+            h,w,c = img.shape
+            qImg = QtGui.QImage(img.data, w, h, w*c, QtGui.QImage.Format_RGB888)
+            pixmap = QtGui.QPixmap.fromImage(qImg)
+            label.setPixmap(pixmap)
+        else:
+            QtWidgets.QMessageBox.about(win, "Error", "Cannot read frame.")
+            print("cannot read frame.")
+            break
+    cap.release()
+    print("Thread end.")
 
-port = 5000
-require_login = False
-streamer = Streamer(port, require_login)
-# Open video device 0
-video_capture = cv2.VideoCapture(0)
+def stop():
+    global running
+    running = False
+    print("stoped..")
 
+def start():
+    global running
+    running = True
+    th = threading.Thread(target=run)
+    th.start()
+    print("started..")
 
-while True:
-    _, frame = video_capture.read()
+def onExit():
+    print("exit")
+    stop()
 
-    streamer.update_frame(frame)
+app = QtWidgets.QApplication([])
+win = QtWidgets.QWidget()
+vbox = QtWidgets.QVBoxLayout()
+label = QtWidgets.QLabel()
+btn_start = QtWidgets.QPushButton("Camera On")
+btn_stop = QtWidgets.QPushButton("Camera Off")
+vbox.addWidget(label)
+vbox.addWidget(btn_start)
+vbox.addWidget(btn_stop)
+win.setLayout(vbox)
+win.show()
 
-    if not streamer.is_streaming:
-        streamer.start_streaming()
+btn_start.clicked.connect(start)
+btn_stop.clicked.connect(stop)
+app.aboutToQuit.connect(onExit)
 
-    cv2.waitKey(30)
-    
-if __name__ == '__main__':
-    app.run(debug=True)
+sys.exit(app.exec_())
