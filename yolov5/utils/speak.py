@@ -3,7 +3,10 @@ from time import sleep
 import pyglet
 import os
 
+
+
 def speak(talk):
+    print(talk)
     tts = gTTS(text=talk, lang = 'ko')
     talkfile = "talk.mp3"
     tts.save(talkfile)
@@ -12,3 +15,4 @@ def speak(talk):
 
     sleep(music.duration) #prevent from killing
     os.remove(talkfile) #remove temperory file
+

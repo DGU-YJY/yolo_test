@@ -2,7 +2,6 @@ from bs4 import BeautifulSoup as bs
 from pprint import pprint
 import requests
 
-from utils.speak import *
 
 
 def get_weather():
@@ -27,7 +26,7 @@ def get_weather():
 
     return data
 
-def weather_speak(data):
+def weather_talk(data):
     talk = "현재 온도는 " + str(data["temp"]) + "도로 "
     talk += data["cast"] +". \n"
     talk += "최저 " + str(data['min'])+"도, "
@@ -61,11 +60,3 @@ def cloth(data):
         res = res +'또한 비가 올 수 있으므로 밝은 옷을 입고, 우산을 챙기세요.'
     return res
 
-
-data = get_weather()
-talk = weather_speak(data)
-print(talk)
-speak(talk)
-talk = cloth(data)
-print(talk)
-speak(talk)

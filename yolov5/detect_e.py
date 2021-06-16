@@ -12,8 +12,10 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
     scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box
 from utils.plots import colors, plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
+
 from utils.colordetect import *
 from utils.speak import *
+from utils.speech2text import *
 
 import numpy as np
 import os
@@ -24,16 +26,27 @@ from gtts import gTTS
 from time import sleep
 import pyglet
 
+
 # save detect info, [label, conf]
 detect_list = []
-time_limit = 10
+time_limit = 30
 cloth_dict = {
     'shirts':"셔츠", 'pants':'바지', 'skirt':'치마', 'socks':'양말', 'hood':'후드', 'jacket':'자켓', 'tshirts':'티셔츠', 'top':'상의'
 }
 
+from main import operation
+
+def end_detect(data):
+    if data in operation[2]:
+        talk = '딩동이 옷 구별을 종료합니다'
+        speak(talk)
+        return True
+
+
 @torch.no_grad()
 def detect(opt):
     dt1 = time_synchronized()
+    stop_detect = False
 
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
@@ -76,7 +89,12 @@ def detect(opt):
     if device.type != 'cpu':
         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
     t0 = time.time()
-    for path, img, im0s, vid_cap in dataset:
+
+
+    for path, img, im0s, vid_cap in dataset:            
+        if stop_detect:
+            break
+
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -90,13 +108,7 @@ def detect(opt):
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, opt.classes, opt.agnostic_nms,
                                    max_det=opt.max_det)
-        t2 = time_synchronized()
-        ###### 시간초과 확인
-        dt2 = time_synchronized()
-        if (dt2 - dt1) > time_limit:
-            print("시간초과 ( %f )" %time_limit)
-            dt1 = time_synchronized()
-            #os._exit(1)
+        
 
         # Apply Classifier
         if classify:
@@ -127,13 +139,21 @@ def detect(opt):
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
                     
-                    # 디텍트한 이미지
-                    if len(detect_list) < 7:
-                        detect_list.append(cls)
-                    else:
+                    detect_list.append(cls)
+                    ###### 시간초과 확인
+                    dt2 = time_synchronized()
+                    if (dt2 - dt1) > time_limit:
+                        print("시간초과 ( %f )" %time_limit)
+                        dt1 = time_synchronized()
+                        detect_list.clear()
+                        stop_detect = end_detect(listening())
+                        path_dir = str(save_dir / 'crops')
+                        shutil.rmtree(path_dir, ignore_errors=True)
+                        #os._exit(1)
+
+                    if len(detect_list) > 7:
                         dt1 = time_synchronized()
                         most = int(np.bincount(detect_list).argmax())
-                        #print("********   ",names[most])
                         detect_list.clear()
                         path_dir = str(save_dir / 'crops')
                         path_img = path_dir + "\\" + names[most]
@@ -146,10 +166,9 @@ def detect(opt):
                         print(color, cloth)
                         talk = color+ " "+ cloth+"입니다."
                         speak(talk)
+                        stop_detect = end_detect(listening())
+                        detect_list.clear()
                         
-
-                        
-
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if opt.save_conf else (cls, conf)
@@ -165,6 +184,7 @@ def detect(opt):
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
             # Print time (inference + NMS)
+            t2 = time_synchronized()
             print(f'{s}Done. ({t2 - t1:.3f}s)')
 
             # Stream results
@@ -197,43 +217,3 @@ def detect(opt):
 
     print(f'Done. ({time.time() - t0:.3f}s)')
 
-
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    #parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
-    parser.add_argument('--weights', nargs='+', type=str, default='weights/best.pt', help='model.pt path(s)')
-    parser.add_argument('--source', type=str, default='0', help='source')
-    #parser.add_argument('--source', type=str, default='data/images', help='source')  # file/folder, 0 for webcam
-    parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
-    #parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
-    parser.add_argument('--conf-thres', type=float, default=0.4, help='object confidence threshold')
-    parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
-    parser.add_argument('--max-det', type=int, default=1000, help='maximum number of detections per image')
-    parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--view-img', action='store_true', help='display results')
-    parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
-    parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
-    parser.add_argument('--save-crop', type=bool ,default=True, help='save cropped prediction boxes')
-    # parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')
-    parser.add_argument('--nosave', action='store_true', help='do not save images/videos')
-    parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --class 0, or --class 0 2 3')
-    parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
-    parser.add_argument('--augment', action='store_true', help='augmented inference')
-    parser.add_argument('--update', action='store_true', help='update all models')
-    parser.add_argument('--project', default='runs/detect', help='save results to project/name')
-    parser.add_argument('--name', default='exp', help='save results to project/name')
-    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-    parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
-    parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
-    parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
-    opt = parser.parse_args()
-    print(opt)
-    check_requirements(exclude=('tensorboard', 'pycocotools', 'thop'))
-
-    if opt.update:  # update all models (to fix SourceChangeWarning)
-        for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
-            detect(opt=opt)
-            strip_optimizer(opt.weights)
-    else:
-        detect(opt=opt)
