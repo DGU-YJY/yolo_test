@@ -1,62 +1,33 @@
-import cv2
-import threading
 import sys
-from PyQt5 import QtWidgets
-from PyQt5 import QtGui
-from PyQt5 import QtCore
+from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, qApp
+from PyQt5.QtGui import QIcon
 
-running = False
-def run():
-    global running
-    cap = cv2.VideoCapture(-1)
-    width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-    height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-    label.resize(width, height)
-    while running:
-        ret, img = cap.read()
-        if ret:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
-            h,w,c = img.shape
-            qImg = QtGui.QImage(img.data, w, h, w*c, QtGui.QImage.Format_RGB888)
-            pixmap = QtGui.QPixmap.fromImage(qImg)
-            label.setPixmap(pixmap)
-        else:
-            QtWidgets.QMessageBox.about(win, "Error", "Cannot read frame.")
-            print("cannot read frame.")
-            break
-    cap.release()
-    print("Thread end.")
 
-def stop():
-    global running
-    running = False
-    print("stoped..")
+class MyApp(QMainWindow):
 
-def start():
-    global running
-    running = True
-    th = threading.Thread(target=run)
-    th.start()
-    print("started..")
+    def __init__(self):
+        super().__init__()
+        self.initUI()
 
-def onExit():
-    print("exit")
-    stop()
+    def initUI(self):
+        exitAction = QAction(QIcon('exit.png'), 'Exit', self)
+        exitAction.setShortcut('Ctrl+Q')
+        exitAction.setStatusTip('Exit application')
+        exitAction.triggered.connect(qApp.quit)
 
-app = QtWidgets.QApplication([])
-win = QtWidgets.QWidget()
-vbox = QtWidgets.QVBoxLayout()
-label = QtWidgets.QLabel()
-btn_start = QtWidgets.QPushButton("Camera On")
-btn_stop = QtWidgets.QPushButton("Camera Off")
-vbox.addWidget(label)
-vbox.addWidget(btn_start)
-vbox.addWidget(btn_stop)
-win.setLayout(vbox)
-win.show()
+        self.statusBar()
 
-btn_start.clicked.connect(start)
-btn_stop.clicked.connect(stop)
-app.aboutToQuit.connect(onExit)
+        menubar = self.menuBar()
+        menubar.setNativeMenuBar(False)
+        filemenu = menubar.addMenu('&File')
+        filemenu.addAction(exitAction)
 
-sys.exit(app.exec_())
+        self.setWindowTitle('Menubar')
+        self.setGeometry(300, 300, 300, 200)
+        self.show()
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    ex = MyApp()
+    sys.exit(app.exec_())
